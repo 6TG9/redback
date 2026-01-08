@@ -1,0 +1,16 @@
+.error {
+  color: red;
+  font-weight: 600;
+}
+
+.success {
+  color: green;
+  font-weight: 600;
+}
+
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  padding: 24px;
+}
+
+form label { display: block; margin-bottom: 8px; }
