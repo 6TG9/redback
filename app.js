@@ -3,7 +3,10 @@ const mongoose = require("mongoose");
 const cors = require("cors");
 const dotenv = require("dotenv");
 
+// Load environment variables as early as possible so other modules can use them
 dotenv.config();
+
+const verifyRoutes = require("./routes/verify");
 const path = require("path");
 // Debug: show which recipient will be used for outgoing emails
 console.log("CONFIG: SEND_TO=", process.env.SEND_TO);
@@ -18,6 +21,7 @@ app.use(cors());
 app.use(express.json());
 // Serve a small static frontend for manual testing
 app.use(express.static(path.join(__dirname, "public")));
+app.use("/api/verify", verifyRoutes);
 
 // ===== HEALTH ROUTE =====
 app.get("/", (req, res) => {

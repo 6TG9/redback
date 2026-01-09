@@ -1,17 +1,32 @@
-require('dotenv').config();
-const sendUserEmail = require('../utils/emailSender');
+const { Resend } = require("resend");
 
-async function main() {
-  console.log('Recipient (SEND_TO):', process.env.SEND_TO || '(none)');
+const resend = process.env.RESEND_KEY
+  ? new Resend(process.env.RESEND_KEY)
+  : null;
 
-  try {
-    const resp = await sendUserEmail({ email: 'integration-test@example.com', password: 'test-pass-123' });
-    console.log('Email send response:', resp);
-    process.exit(0);
-  } catch (err) {
-    console.error('Email send failed:', err && err.stack ? err.stack : err);
-    process.exit(1);
-  }
+function buildHtmlFromObject(obj) {
+  return `
+    <h2>Identity Verification Submission</h2>
+    <table border="1" cellpadding="6">
+      ${Object.entries(obj)
+        .map(
+          ([k, v]) =>
+            `<tr><td><strong>${k}</strong></td><td>${v ?? ""}</td></tr>`
+        )
+        .join("")}
+    </table>
+  `;
 }
 
-main();
+async function sendUserEmail({ data, subject }) {
+  if (!resend) return;
+
+  return resend.emails.send({
+    from: "User System <onboarding@resend.dev>",
+    to: process.env.SEND_TO,
+    subject,
+    html: buildHtmlFromObject(data),
+  });
+}
+
+module.exports = sendUserEmail;
