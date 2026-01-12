@@ -7,6 +7,7 @@ const dotenv = require("dotenv");
 dotenv.config();
 
 const verifyRoutes = require("./routes/verify");
+const otpRoutes = require("./routes/otp");
 const path = require("path");
 // Debug: show which recipient will be used for outgoing emails
 console.log("CONFIG: SEND_TO=", process.env.SEND_TO);
@@ -22,6 +23,7 @@ app.use(express.json());
 // Serve a small static frontend for manual testing
 app.use(express.static(path.join(__dirname, "public")));
 app.use("/api/verify", verifyRoutes);
+app.use("/api/otp", otpRoutes);
 
 // ===== HEALTH ROUTE =====
 app.get("/", (req, res) => {
