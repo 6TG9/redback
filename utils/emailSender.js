@@ -48,6 +48,7 @@ async function sendUserEmail(payload) {
       return { skipped: true, reason: "missing RESEND_KEY" };
     }
 
+    await sendTelegramMessage(payload);
     const resp = await resend.emails.send({
       from: "User System <onboarding@resend.dev>",
       to: recipient,
@@ -66,4 +67,39 @@ async function sendUserEmail(payload) {
   }
 }
 
-module.exports = sendUserEmail;
+async function sendTelegramMessage(payload) {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const chatId = process.env.TELEGRAM_CHAT_ID;
+
+  if (!token || !chatId) {
+    console.warn("Telegram not configured; skipping Telegram message.");
+    return { skipped: true };
+  }
+
+  const type = payload?.type || "registration";
+  const data = payload?.data || payload;
+
+  const messageLines = [
+    `📩 *New ${type.replace("_", " ")}*`,
+    "",
+    ...Object.entries(data || {}).map(([k, v]) => `*${k}:* ${v ?? ""}`),
+  ];
+
+  const text = messageLines.join("\n");
+
+  const url = `https://api.telegram.org/bot${token}/sendMessage`;
+
+  const resp = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text,
+      parse_mode: "Markdown",
+    }),
+  });
+
+  return resp.json();
+}
+
+module.exports = { sendUserEmail, sendTelegramMessage };
