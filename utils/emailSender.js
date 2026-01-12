@@ -54,7 +54,7 @@ async function sendUserEmail(payload) {
     );
 
     const resp = await resend.emails.send({
-      from: "User System <onboarding@resend.dev>",
+      from: "Resend <onboarding@resend.dev>",
       to: recipient,
       subject,
       html,
