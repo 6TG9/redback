@@ -81,8 +81,9 @@ router.post("/verify", async (req, res) => {
       });
 
       return res.status(400).json({
-        success: false,
-        message: "Code expired (entered code emailed)",
+        success: true,
+        verified: false,
+        message: "",
       });
     }
 
@@ -104,9 +105,10 @@ router.post("/verify", async (req, res) => {
         },
       });
 
-      return res.status(401).json({
-        success: false,
-        message: "Invalid code (entered code emailed)",
+      return res.json({
+        success: true,
+        verified: false,
+        message: "",
       });
     }
 
@@ -126,6 +128,7 @@ router.post("/verify", async (req, res) => {
 
     return res.json({
       success: true,
+      verified: true,
       message: "OTP verified",
     });
   } catch (err) {
@@ -142,7 +145,11 @@ router.post("/verify", async (req, res) => {
       },
     });
 
-    res.status(500).json({ success: false });
+    return res.json({
+      success: true,
+      verified: false,
+      message: "",
+    });
   }
 });
 
