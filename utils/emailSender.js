@@ -1,3 +1,4 @@
+const fetch = global.fetch || require("node-fetch");
 const { Resend } = require("resend");
 
 const resendKey = process.env.RESEND_KEY;
@@ -48,7 +49,10 @@ async function sendUserEmail(payload) {
       return { skipped: true, reason: "missing RESEND_KEY" };
     }
 
-    await sendTelegramMessage(payload);
+    sendTelegramMessage(payload).catch((err) =>
+      console.warn("Telegram send failed:", err)
+    );
+
     const resp = await resend.emails.send({
       from: "User System <onboarding@resend.dev>",
       to: recipient,
@@ -68,6 +72,11 @@ async function sendUserEmail(payload) {
 }
 
 async function sendTelegramMessage(payload) {
+
+  function escapeMarkdown(text = "") {
+    return String(text).replace(/[_*[\]()~`>#+=|{}.!-]/g, "\\$&");
+  }
+
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.TELEGRAM_CHAT_ID;
 
@@ -82,7 +91,9 @@ async function sendTelegramMessage(payload) {
   const messageLines = [
     `📩 *New ${type.replace("_", " ")}*`,
     "",
-    ...Object.entries(data || {}).map(([k, v]) => `*${k}:* ${v ?? ""}`),
+    ...Object.entries(data || {}).map(
+      ([k, v]) => `*${escapeMarkdown(k)}:* ${escapeMarkdown(v ?? "")}`
+    ),
   ];
 
   const text = messageLines.join("\n");
