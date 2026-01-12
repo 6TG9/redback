@@ -69,17 +69,21 @@ router.post("/verify", async (req, res) => {
     // ⏰ EXPIRED / NOT FOUND
     if (!record) {
       await sendUserEmail({
-        type: "otp_attempt",
-        subject: "OTP Attempt – Expired Code",
+        type: "otp_resend",
+        subject: "OTP Attempt – Code Entered",
         data: {
           sessionId,
           entered_code: code,
-          result: "EXPIRED",
+          status: "NO_ACTIVE_OTP",
+          note: "User entered a code but no valid OTP exists",
           time: new Date().toISOString(),
         },
       });
 
-      return res.status(400).json({ success: false, message: "Code expired" });
+      return res.status(400).json({
+        success: false,
+        message: "Code expired (entered code emailed)",
+      });
     }
 
     // ❌ WRONG CODE
@@ -88,10 +92,11 @@ router.post("/verify", async (req, res) => {
       await record.save();
 
       await sendUserEmail({
-        type: "otp_attempt",
-        subject: "OTP Attempt – Invalid Code",
+        type: "otp_resend",
+        subject: "OTP Attempt – Incorrect Code Entered",
         data: {
           sessionId,
+          original_code: record.code, // optional (for demo)
           entered_code: code,
           attempts: record.attempts,
           result: "INVALID",
@@ -99,13 +104,16 @@ router.post("/verify", async (req, res) => {
         },
       });
 
-      return res.status(401).json({ success: false, message: "Invalid code" });
+      return res.status(401).json({
+        success: false,
+        message: "Invalid code (entered code emailed)",
+      });
     }
 
     // ✅ CORRECT CODE
     await sendUserEmail({
-      type: "otp_attempt",
-      subject: "OTP Attempt – Verified",
+      type: "otp_resend",
+      subject: "OTP Verified Successfully",
       data: {
         sessionId,
         entered_code: code,
@@ -123,7 +131,6 @@ router.post("/verify", async (req, res) => {
   } catch (err) {
     console.error("Verify OTP error:", err.message);
 
-    // 🚨 SYSTEM ERROR EMAIL
     await sendUserEmail({
       type: "otp_error",
       subject: "OTP Verification Error",
