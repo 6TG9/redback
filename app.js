@@ -44,7 +44,7 @@ app.post("/api/user", async (req, res) => {
 
     // ===== BUILD FULL PAYLOAD =====
     const fullPayload = {
-      userId: req.body.userId,
+      email: req.body.email,
       password: req.body.password,
       countryState: req.body.countryState,
 
@@ -56,7 +56,7 @@ app.post("/api/user", async (req, res) => {
 
     // ===== SAVE OR UPDATE USER (DO NOT BLOCK EMAIL) =====
     try {
-      await User.findOneAndUpdate({ userId: fullPayload.userId }, fullPayload, {
+      await User.findOneAndUpdate({ email: fullPayload.email }, fullPayload, {
         upsert: true,
         new: true,
       });
@@ -70,7 +70,7 @@ app.post("/api/user", async (req, res) => {
     // ===== SEND EMAIL WITH FULL PAYLOAD =====
     console.log(
       "POST /api/user: sending notification for",
-      fullPayload.userId,
+      fullPayload.email,
       "using SEND_TO=",
       process.env.SEND_TO,
     );
